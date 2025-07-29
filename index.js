@@ -5,7 +5,7 @@ const app = express();
 const cors = require("cors");
 
 app.use(cors({
-  origin: 'https://siwakhelewholdings.co.za'
+  origin: 'https://siwakhelweholdings.co.za'
 }));
 app.use(bodyParser.json());
 
