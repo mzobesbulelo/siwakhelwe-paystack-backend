@@ -4,7 +4,9 @@ const axios = require("axios");
 const app = express();
 const cors = require("cors");
 
-app.use(cors());
+app.use(cors({
+  origin: 'https://siwakhelewholdings.co.za'
+}));
 app.use(bodyParser.json());
 
 const PAYSTACK_SECRET_KEY = process.env.PAYSTACK_SECRET_KEY;
