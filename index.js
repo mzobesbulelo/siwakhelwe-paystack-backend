@@ -6,10 +6,16 @@ const postmark = require("postmark");
 
 const app = express();
 
-// Allow only your frontend
+// ✅ Proper CORS setup
 app.use(cors({
-  origin: 'https://siwakhelweholdings.co.za'
+  origin: 'https://siwakhelweholdings.co.za',
+  methods: ['GET', 'POST', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
 }));
+
+// ✅ Handle preflight requests explicitly
+app.options("*", cors());
+
 app.use(bodyParser.json());
 
 // Env variables
@@ -56,12 +62,9 @@ app.post("/pay", async (req, res) => {
               display_name: "Cart Items",
               variable_name: "cart_items",
               value: Array.isArray(items)
-                ? items
-                    .map(
-                      (item, i) =>
-                        `Item ${i + 1}: ${item.preset}, ${item.handleType}, ${item.mugType}, ${item.mugColor}, ${item.replacementName}, ${item.price}`
-                    )
-                    .join(" | ")
+                ? items.map((item, i) =>
+                    `Item ${i + 1}: ${item.preset}, ${item.handleType}, ${item.mugType}, ${item.mugColor}, ${item.replacementName}, ${item.price}`
+                  ).join(" | ")
                 : "No items"
             }
           ]
@@ -94,7 +97,7 @@ This email was sent in test mode.
     `;
 
     await postmarkClient.sendEmail({
-      From: "test@siwakhelweholdings.co.za", // ✅ Replace with verified Postmark sender
+      From: "test@siwakhelweholdings.co.za", // ✅ Must be a verified Postmark sender
       To: emailValue,
       Subject: "Your Order Confirmation (Test Mode)",
       TextBody: emailBody,
