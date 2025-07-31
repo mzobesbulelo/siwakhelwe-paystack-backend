@@ -6,19 +6,20 @@ const postmark = require("postmark");
 
 const app = express();
 
-// ✅ Proper CORS setup
+// ✅ CORS - this must come *before* any other middleware or routes
 app.use(cors({
-  origin: 'https://siwakhelweholdings.co.za',
-  methods: ['GET', 'POST', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
+  origin: "https://siwakhelweholdings.co.za",
+  methods: ["GET", "POST", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"],
+  credentials: true
 }));
 
-// ✅ Handle preflight requests
+// ✅ Preflight request handler (needed for some browsers and servers)
 app.options("*", cors());
 
 app.use(bodyParser.json());
 
-// Env variables
+// ✅ Environment variables
 const PAYSTACK_SECRET_KEY = process.env.PAYSTACK_SECRET_KEY;
 const POSTMARK_TOKEN = process.env.POSTMARK_TOKEN;
 const postmarkClient = new postmark.ServerClient(POSTMARK_TOKEN);
@@ -36,12 +37,12 @@ app.post("/pay", async (req, res) => {
   console.log("Received items:", items);
 
   try {
-    // 1. INITIATE PAYSTACK PAYMENT
+    // 🟢 Initialize Paystack payment
     const response = await axios.post(
       "https://api.paystack.co/transaction/initialize",
       {
         email: emailValue,
-        amount: amount * 100, // Paystack uses kobo
+        amount: amount * 100,
         metadata: {
           custom_fields: [
             { display_name: "Full Name", variable_name: "full_name", value: fullNameValue },
@@ -51,46 +52,38 @@ app.post("/pay", async (req, res) => {
               display_name: "Cart Items",
               variable_name: "cart_items",
               value: Array.isArray(items)
-                ? items.map((item, i) => {
-                    const parts = [];
-                    if (item.preset) parts.push(`Preset ${item.preset}`);
-                    if (item.handleType) parts.push(`Handle Type: ${item.handleType}`);
-                    if (item.mugType) parts.push(`Mug Type: ${item.mugType}`);
-                    if (item.mugColor) parts.push(`Mug Color: ${item.mugColor}`);
-                    if (item.replacementName) parts.push(`Replacement Name: ${item.replacementName}`);
-                    return `Item ${i + 1}: ${parts.join(', ')}, R${item.price}`;
-                  }).join(" | ")
+                ? items.map((item, i) =>
+                    `Item ${i + 1}: ${item.preset || ""}, ${item.handleType || ""}, ${item.mugType || ""}, ${item.mugColor || ""}, ${item.replacementName || ""}, R${item.price}`
+                  ).join(" | ")
                 : "No items"
             }
           ]
-        },
+        }
       },
       {
         headers: {
           Authorization: `Bearer ${PAYSTACK_SECRET_KEY}`,
-          "Content-Type": "application/json",
-        },
+          "Content-Type": "application/json"
+        }
       }
     );
 
-    // 2. FORMAT ITEMS FOR POSTMARK TEMPLATE
-    const formattedItems = items.map((item) => {
-      const parts = [];
-      if (item.preset) parts.push(`Preset ${item.preset}`);
-      if (item.handleType) parts.push(`Handle Type: ${item.handleType}`);
-      if (item.mugType) parts.push(`Mug Type: ${item.mugType}`);
-      if (item.mugColor) parts.push(`Mug Color: ${item.mugColor}`);
-      if (item.replacementName) parts.push(`Replacement Name: ${item.replacementName}`);
-      return {
-        name: parts.join(', '),
-        quantity: 1,
-        price: item.price
-      };
-    });
+    // 🟢 Format items for Postmark
+    const formattedItems = items.map((item) => ({
+      name: [
+        item.preset,
+        item.handleType,
+        item.mugType,
+        item.mugColor,
+        item.replacementName
+      ].filter(Boolean).join(", "),
+      quantity: 1,
+      price: item.price
+    }));
 
-    // 3. SEND POSTMARK TEMPLATE EMAIL
+    // 🟢 Send email receipt using Postmark template
     await postmarkClient.sendEmailWithTemplate({
-      From: "test@siwakhelweholdings.co.za", // ✅ Must be verified in Postmark
+      From: "test@siwakhelweholdings.co.za",
       To: emailValue,
       TemplateAlias: "mugs_receipt",
       TemplateModel: {
