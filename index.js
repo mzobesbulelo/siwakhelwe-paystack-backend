@@ -94,7 +94,7 @@ This email was sent in test mode.
     `;
 
     await postmarkClient.sendEmail({
-      From: "you@yourdomain.com", // ✅ Replace with verified Postmark sender
+      From: "test@siwakhelweholdings.co.za", // ✅ Replace with verified Postmark sender
       To: emailValue,
       Subject: "Your Order Confirmation (Test Mode)",
       TextBody: emailBody,
