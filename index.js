@@ -6,20 +6,17 @@ const postmark = require("postmark");
 
 const app = express();
 
-// ✅ CORS - this must come *before* any other middleware or routes
+// ✅ Proper CORS setup
 app.use(cors({
-  origin: "https://siwakhelweholdings.co.za",
-  methods: ["GET", "POST", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization"],
-  credentials: true
+  origin: 'https://siwakhelweholdings.co.za',
+  methods: ['GET', 'POST', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
 }));
 
-// ✅ Preflight request handler (needed for some browsers and servers)
 app.options("*", cors());
-
 app.use(bodyParser.json());
 
-// ✅ Environment variables
+// Env variables
 const PAYSTACK_SECRET_KEY = process.env.PAYSTACK_SECRET_KEY;
 const POSTMARK_TOKEN = process.env.POSTMARK_TOKEN;
 const postmarkClient = new postmark.ServerClient(POSTMARK_TOKEN);
@@ -37,12 +34,12 @@ app.post("/pay", async (req, res) => {
   console.log("Received items:", items);
 
   try {
-    // 🟢 Initialize Paystack payment
+    // 1. INITIATE PAYSTACK PAYMENT
     const response = await axios.post(
       "https://api.paystack.co/transaction/initialize",
       {
         email: emailValue,
-        amount: amount * 100,
+        amount: amount * 100, // Paystack uses kobo
         metadata: {
           custom_fields: [
             { display_name: "Full Name", variable_name: "full_name", value: fullNameValue },
@@ -53,37 +50,41 @@ app.post("/pay", async (req, res) => {
               variable_name: "cart_items",
               value: Array.isArray(items)
                 ? items.map((item, i) =>
-                    `Item ${i + 1}: ${item.preset || ""}, ${item.handleType || ""}, ${item.mugType || ""}, ${item.mugColor || ""}, ${item.replacementName || ""}, R${item.price}`
+                    `Item ${i + 1}: ${item.preset}, ${item.handleType}, ${item.mugType}, ${item.mugColor}, ${item.replacementName}, R${item.price}`
                   ).join(" | ")
                 : "No items"
             }
           ]
-        }
+        },
       },
       {
         headers: {
           Authorization: `Bearer ${PAYSTACK_SECRET_KEY}`,
-          "Content-Type": "application/json"
-        }
+          "Content-Type": "application/json",
+        },
       }
     );
 
-    // 🟢 Format items for Postmark
-    const formattedItems = items.map((item) => ({
-      name: [
-        item.preset,
-        item.handleType,
-        item.mugType,
-        item.mugColor,
-        item.replacementName
-      ].filter(Boolean).join(", "),
-      quantity: 1,
-      price: item.price
-    }));
+    // 2. FORMAT ITEMS FOR POSTMARK TEMPLATE — FIXED
+    const formattedItems = items.map((item, i) => {
+      const nameParts = [];
 
-    // 🟢 Send email receipt using Postmark template
+      if (item.preset) nameParts.push(`Preset: ${item.preset}`);
+      if (item.handleType) nameParts.push(`Handle Type: ${item.handleType}`);
+      if (item.mugType) nameParts.push(`Mug Type: ${item.mugType}`);
+      if (item.mugColor) nameParts.push(`Mug Color: ${item.mugColor}`);
+      if (item.replacementName) nameParts.push(`Replacement Name: ${item.replacementName}`);
+
+      return {
+        name: nameParts.length ? nameParts.join(", ") : `Item ${i + 1}`,
+        quantity: 1,
+        price: item.price || 0
+      };
+    });
+
+    // 3. SEND POSTMARK TEMPLATE EMAIL
     await postmarkClient.sendEmailWithTemplate({
-      From: "test@siwakhelweholdings.co.za",
+      From: "test@siwakhelweholdings.co.za", // ✅ Must be verified in Postmark
       To: emailValue,
       TemplateAlias: "mugs_receipt",
       TemplateModel: {
