@@ -13,7 +13,7 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization'],
 }));
 
-// ✅ Handle preflight requests explicitly
+// ✅ Handle preflight requests
 app.options("*", cors());
 
 app.use(bodyParser.json());
@@ -36,34 +36,23 @@ app.post("/pay", async (req, res) => {
   console.log("Received items:", items);
 
   try {
+    // 1. INITIATE PAYSTACK PAYMENT
     const response = await axios.post(
       "https://api.paystack.co/transaction/initialize",
       {
         email: emailValue,
-        amount: amount * 100, // amount in kobo
+        amount: amount * 100, // Paystack uses kobo
         metadata: {
           custom_fields: [
-            {
-              display_name: "Full Name",
-              variable_name: "full_name",
-              value: fullNameValue
-            },
-            {
-              display_name: "Phone Number",
-              variable_name: "phone_number",
-              value: phoneValue
-            },
-            {
-              display_name: "Delivery Method",
-              variable_name: "delivery_method",
-              value: deliveryMethod
-            },
+            { display_name: "Full Name", variable_name: "full_name", value: fullNameValue },
+            { display_name: "Phone Number", variable_name: "phone_number", value: phoneValue },
+            { display_name: "Delivery Method", variable_name: "delivery_method", value: deliveryMethod },
             {
               display_name: "Cart Items",
               variable_name: "cart_items",
               value: Array.isArray(items)
                 ? items.map((item, i) =>
-                    `Item ${i + 1}: ${item.preset}, ${item.handleType}, ${item.mugType}, ${item.mugColor}, ${item.replacementName}, ${item.price}`
+                    `Item ${i + 1}: ${item.preset}, ${item.handleType}, ${item.mugType}, ${item.mugColor}, ${item.replacementName}, R${item.price}`
                   ).join(" | ")
                 : "No items"
             }
@@ -78,38 +67,33 @@ app.post("/pay", async (req, res) => {
       }
     );
 
-    // ✅ After Paystack responds successfully, send email
-    const cartList = items.map((item, i) => {
-      return `${i + 1}. ${item.preset}, ${item.handleType}, ${item.mugType}, ${item.mugColor}, ${item.replacementName} — R${item.price}`;
-    }).join("\n");
+    // 2. FORMAT ITEMS FOR POSTMARK TEMPLATE
+    const formattedItems = items.map((item) => ({
+      name: `${item.preset}, ${item.handleType}, ${item.mugType}, ${item.mugColor}, ${item.replacementName}`,
+      quantity: 1,
+      price: item.price
+    }));
 
-    const emailBody = `
-Hi ${fullNameValue},
-
-Your order has been initiated successfully. Here are the items you selected:
-
-${cartList}
-
-Delivery Method: ${deliveryMethod}
-Total: R${amount}
-
-This email was sent in test mode.
-    `;
-
-    await postmarkClient.sendEmail({
-      From: "test@siwakhelweholdings.co.za", // ✅ Must be a verified Postmark sender
+    // 3. SEND POSTMARK TEMPLATE EMAIL
+    await postmarkClient.sendEmailWithTemplate({
+      From: "test@siwakhelweholdings.co.za", // ✅ Must be verified in Postmark
       To: emailValue,
-      Subject: "Your Order Confirmation (Test Mode)",
-      TextBody: emailBody,
+      TemplateAlias: "called_receipt",
+      TemplateModel: {
+        fullNameValue,
+        emailValue,
+        phoneValue,
+        deliveryMethod,
+        amount,
+        items: formattedItems
+      }
     });
 
     console.log("Paystack response:", response.data);
     res.send(response.data);
+
   } catch (error) {
-    console.error(
-      "Error initializing payment:",
-      error.response?.data || error.message,
-    );
+    console.error("Error initializing payment:", error.response?.data || error.message);
     res.status(500).json({ error: error.response?.data || error.message });
   }
 });
