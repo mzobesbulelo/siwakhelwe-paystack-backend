@@ -51,9 +51,15 @@ app.post("/pay", async (req, res) => {
               display_name: "Cart Items",
               variable_name: "cart_items",
               value: Array.isArray(items)
-                ? items.map((item, i) =>
-                    `Item ${i + 1}: ${item.preset}, ${item.handleType}, ${item.mugType}, ${item.mugColor}, ${item.replacementName}, R${item.price}`
-                  ).join(" | ")
+                ? items.map((item, i) => {
+                    const parts = [];
+                    if (item.preset) parts.push(`Preset ${item.preset}`);
+                    if (item.handleType) parts.push(`Handle Type: ${item.handleType}`);
+                    if (item.mugType) parts.push(`Mug Type: ${item.mugType}`);
+                    if (item.mugColor) parts.push(`Mug Color: ${item.mugColor}`);
+                    if (item.replacementName) parts.push(`Replacement Name: ${item.replacementName}`);
+                    return `Item ${i + 1}: ${parts.join(', ')}, R${item.price}`;
+                  }).join(" | ")
                 : "No items"
             }
           ]
@@ -68,11 +74,19 @@ app.post("/pay", async (req, res) => {
     );
 
     // 2. FORMAT ITEMS FOR POSTMARK TEMPLATE
-    const formattedItems = items.map((item) => ({
-      name: `${item.preset}, ${item.handleType}, ${item.mugType}, ${item.mugColor}, ${item.replacementName}`,
-      quantity: 1,
-      price: item.price
-    }));
+    const formattedItems = items.map((item) => {
+      const parts = [];
+      if (item.preset) parts.push(`Preset ${item.preset}`);
+      if (item.handleType) parts.push(`Handle Type: ${item.handleType}`);
+      if (item.mugType) parts.push(`Mug Type: ${item.mugType}`);
+      if (item.mugColor) parts.push(`Mug Color: ${item.mugColor}`);
+      if (item.replacementName) parts.push(`Replacement Name: ${item.replacementName}`);
+      return {
+        name: parts.join(', '),
+        quantity: 1,
+        price: item.price
+      };
+    });
 
     // 3. SEND POSTMARK TEMPLATE EMAIL
     await postmarkClient.sendEmailWithTemplate({
