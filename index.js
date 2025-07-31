@@ -78,7 +78,7 @@ app.post("/pay", async (req, res) => {
     await postmarkClient.sendEmailWithTemplate({
       From: "test@siwakhelweholdings.co.za", // ✅ Must be verified in Postmark
       To: emailValue,
-      TemplateAlias: "called_receipt",
+      TemplateAlias: "mugs_receipt",
       TemplateModel: {
         fullNameValue,
         emailValue,
