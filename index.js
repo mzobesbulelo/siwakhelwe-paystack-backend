@@ -20,7 +20,7 @@ app.use(bodyParser.json());
 
 // Env variables
 const PAYSTACK_SECRET_KEY = process.env.PAYSTACK_SECRET_KEY;
-const POSTMARK_TOKEN = process.env.POSTMARK_TOKEN || "POSTMARK_API_TEST";
+const POSTMARK_TOKEN = process.env.POSTMARK_TOKEN;
 const postmarkClient = new postmark.ServerClient(POSTMARK_TOKEN);
 
 app.post("/pay", async (req, res) => {
