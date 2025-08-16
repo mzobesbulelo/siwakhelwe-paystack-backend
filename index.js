@@ -49,9 +49,12 @@ app.post("/pay", async (req, res) => {
               display_name: "Cart Items",
               variable_name: "cart_items",
               value: Array.isArray(items)
-                ? items.map((item, i) =>
-                    `Item ${i + 1}: ${item.preset}, ${item.handleType}, ${item.mugType}, ${item.mugColor}, ${item.replacementName}, R${item.price}`
-                  ).join(" | ")
+                ? items.map((item, i) => {
+                    let details = Object.entries(item)
+                      .map(([key, val]) => `${key}: ${val}`)
+                      .join(", ");
+                    return `Item ${i + 1}: ${details}`;
+                  }).join(" | ")
                 : "No items"
             }
           ]
@@ -65,19 +68,25 @@ app.post("/pay", async (req, res) => {
       }
     );
 
-    // 2. FORMAT ITEMS FOR POSTMARK TEMPLATE — FIXED
+    // 2. FORMAT ITEMS FOR POSTMARK TEMPLATE
     const formattedItems = items.map((item, i) => {
-      const nameParts = [];
+      let nameParts = [];
 
+      // Build details dynamically from keys that exist
       if (item.preset) nameParts.push(`Preset: ${item.preset}`);
       if (item.handleType) nameParts.push(`Handle Type: ${item.handleType}`);
       if (item.mugType) nameParts.push(`Mug Type: ${item.mugType}`);
       if (item.mugColor) nameParts.push(`Mug Color: ${item.mugColor}`);
       if (item.replacementName) nameParts.push(`Replacement Name: ${item.replacementName}`);
 
+      // If no known fields exist, fall back to all keys
+      if (nameParts.length === 0) {
+        nameParts = Object.entries(item).map(([key, val]) => `${key}: ${val}`);
+      }
+
       return {
-        name: nameParts.length ? nameParts.join(", ") : `Item ${i + 1}`,
-        quantity: 1,
+        name: nameParts.join(", "),
+        quantity: item.quantity || 1,
         price: item.price || 0
       };
     });
