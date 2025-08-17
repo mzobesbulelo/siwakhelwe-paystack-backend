@@ -1,4 +1,4 @@
-// server.js
+// index.js
 require("dotenv").config();
 const express = require("express");
 const axios = require("axios");
@@ -100,22 +100,36 @@ const describeItem = (item, index) => {
   }
 
   if (parts.length === 0 && typeof item === "object") {
-    const skip = new Set(["quantity", "qty", "price", "total", "lineTotal", "id", "sku", "image", "images", "thumb", "_line", "preset"]);
+    const skip = new Set([
+      "quantity", "qty", "price", "total", "lineTotal",
+      "id", "sku", "image", "images", "thumb", "_line",
+      "preset"
+    ]);
+
     const rest = Object.entries(item)
       .filter(([k, v]) => !skip.has(k) && v != null && String(v).trim() !== "")
       .map(([k, v]) => `${toTitle(k)}: ${asReadable(v)}`);
+
     if (rest.length) parts.push(...rest);
   }
 
-  return parts.length === 0 ? `Item ${index}` : parts.join(", ");
+  if (parts.length === 0) return `Item ${index}`;
+  return parts.join(", ");
 };
 
 // ---------- Routes ----------
 
-// Initialize Paystack transaction
+// Initialize Paystack payment
 app.post("/pay", async (req, res) => {
   try {
-    const { amount, items, deliveryMethod, phoneValue, emailValue, fullNameValue } = req.body;
+    const {
+      amount,
+      items,
+      deliveryMethod,
+      phoneValue,
+      emailValue,
+      fullNameValue,
+    } = req.body;
 
     if (!emailValue || !phoneValue || !fullNameValue) {
       return res.status(400).json({ error: "Missing customer details." });
@@ -165,47 +179,43 @@ app.post("/pay", async (req, res) => {
   }
 });
 
-// Verify Paystack transaction and send receipt
-app.post("/paystack/verify", async (req, res) => {
+// Paystack webhook for successful payments
+app.post("/paystack-webhook", express.json({ type: "*/*" }), async (req, res) => {
+  const event = req.body;
+
   try {
-    const { reference, emailValue, fullNameValue, phoneValue, deliveryMethod, items } = req.body;
+    if (event.event === "charge.success") {
+      const data = event.data;
 
-    if (!reference) return res.status(400).json({ error: "Missing transaction reference." });
+      const fullNameValue = data.metadata.full_name;
+      const emailValue = data.customer?.email || data.metadata.email;
+      const phoneValue = data.metadata.phone_number;
+      const deliveryMethod = data.metadata.delivery_method;
+      const cartItems = data.metadata.cart_items;
 
-    const verifyRes = await axios.get(`https://api.paystack.co/transaction/verify/${reference}`, {
-      headers: { Authorization: `Bearer ${PAYSTACK_SECRET_KEY}` }
-    });
+      const items = cartItems.split(" | ").map((desc, i) => ({ name: desc, quantity: 1, price: 0 }));
 
-    const data = verifyRes.data.data;
+      await postmarkClient.sendEmailWithTemplate({
+        From: "test@siwakhelweholdings.co.za",
+        To: emailValue,
+        TemplateAlias: "mugs_receipt",
+        TemplateModel: {
+          fullNameValue,
+          emailValue,
+          phoneValue,
+          deliveryMethod,
+          amount: data.amount / 100,
+          items
+        }
+      });
 
-    if (data.status !== "success") {
-      return res.status(400).json({ error: "Payment not successful" });
+      console.log("Receipt sent for successful payment:", data.reference);
     }
 
-    const formattedItems = items.map((it, i) => ({
-      name: describeItem(it, i + 1),
-      quantity: it.quantity,
-      price: it.price
-    }));
-
-    await postmarkClient.sendEmailWithTemplate({
-      From: "test@siwakhelweholdings.co.za",
-      To: emailValue,
-      TemplateAlias: "mugs_receipt",
-      TemplateModel: {
-        fullNameValue,
-        emailValue,
-        phoneValue,
-        deliveryMethod: deliveryMethod || "",
-        amount: data.amount / 100,
-        items: formattedItems
-      }
-    });
-
-    return res.json({ success: true, data });
+    res.sendStatus(200);
   } catch (err) {
-    console.error("Error verifying payment:", err?.response?.data || err.message);
-    return res.status(500).json({ error: "Verification failed" });
+    console.error("Error sending email:", err);
+    res.sendStatus(500);
   }
 });
 
