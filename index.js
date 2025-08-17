@@ -144,7 +144,7 @@ app.post("/paystack-webhook", async (req, res) => {
       }
 
       await postmarkClient.sendEmailWithTemplate({
-        From: "test@siwakhelweholdings.co.za",
+        From: "sales@siwakhelweholdings.co.za",
         To: emailValue,
         TemplateAlias: "mugs_receipt",
         TemplateModel: {
