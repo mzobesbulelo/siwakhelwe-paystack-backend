@@ -136,13 +136,26 @@ app.post("/paystack-webhook", async (req, res) => {
       const fullNameValue = event.data.metadata?.custom_fields?.find(f => f.variable_name === "full_name")?.value;
       const phoneValue = event.data.metadata?.custom_fields?.find(f => f.variable_name === "phone_number")?.value;
       const deliveryMethod = event.data.metadata?.custom_fields?.find(f => f.variable_name === "delivery_method")?.value;
-      const cartItems = event.data.metadata?.custom_fields?.find(f => f.variable_name === "cart_items")?.value;
+      const cartItemsString = event.data.metadata?.custom_fields?.find(f => f.variable_name === "cart_items")?.value;
 
       if (!emailValue) {
         console.error("Webhook: customer email missing");
         return res.sendStatus(400);
       }
 
+      // Convert cart items string into an array of objects for Postmark
+      const itemsArray = (cartItemsString || "")
+        .split(" | ")
+        .map(line => {
+          const match = line.match(/Item \d+: (.+) \+R(\d+)/);
+          return {
+            name: match ? match[1] : line,
+            quantity: 1, // default quantity
+            price: match ? Number(match[2]) : 0
+          };
+        });
+
+      // Send the email
       await postmarkClient.sendEmailWithTemplate({
         From: "sales@siwakhelweholdings.co.za",
         To: emailValue,
@@ -152,7 +165,8 @@ app.post("/paystack-webhook", async (req, res) => {
           emailValue,
           phoneValue,
           deliveryMethod,
-          items: cartItems
+          amount: event.data.amount / 100, // convert from Kobo
+          items: itemsArray
         }
       });
 
