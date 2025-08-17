@@ -196,7 +196,7 @@ app.post("/paystack-webhook", express.json({ type: "*/*" }), async (req, res) =>
       const items = cartItems.split(" | ").map((desc, i) => ({ name: desc, quantity: 1, price: 0 }));
 
       await postmarkClient.sendEmailWithTemplate({
-        From: "test@siwakhelweholdings.co.za",
+        From: "sales@siwakhelweholdings.co.za",
         To: emailValue,
         TemplateAlias: "mugs_receipt",
         TemplateModel: {
