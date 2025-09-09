@@ -155,11 +155,10 @@ app.post("/paystack-webhook", async (req, res) => {
           };
         });
 
-      // Send the email (customer + sales BCC)
+      // 1) Customer email
       await postmarkClient.sendEmailWithTemplate({
         From: "sales@siwakhelweholdings.co.za",
         To: emailValue,
-        Bcc: "sales@siwakhelweholdings.co.za",
         TemplateAlias: "mugs_receipt",
         TemplateModel: {
           fullNameValue,
@@ -171,7 +170,22 @@ app.post("/paystack-webhook", async (req, res) => {
         }
       });
 
-      console.log("Receipt email sent to", emailValue, "and sales@siwakhelweholdings.co.za");
+      // 2) Separate internal copy to Sales
+      await postmarkClient.sendEmailWithTemplate({
+        From: "sales@siwakhelweholdings.co.za",
+        To: "sales@siwakhelweholdings.co.za",
+        TemplateAlias: "mugs_receipt",
+        TemplateModel: {
+          fullNameValue,
+          emailValue,
+          phoneValue,
+          deliveryMethod,
+          amount: event.data.amount / 100, // convert from Kobo
+          items: itemsArray
+        }
+      });
+
+      console.log("Receipt emails sent to", emailValue, "and sales@siwakhelweholdings.co.za");
     }
 
     res.sendStatus(200);
