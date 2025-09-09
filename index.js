@@ -155,10 +155,11 @@ app.post("/paystack-webhook", async (req, res) => {
           };
         });
 
-      // Send the email
+      // Send the email (customer + sales BCC)
       await postmarkClient.sendEmailWithTemplate({
         From: "sales@siwakhelweholdings.co.za",
         To: emailValue,
+        Bcc: "sales@siwakhelweholdings.co.za",
         TemplateAlias: "mugs_receipt",
         TemplateModel: {
           fullNameValue,
@@ -170,7 +171,7 @@ app.post("/paystack-webhook", async (req, res) => {
         }
       });
 
-      console.log("Receipt email sent to", emailValue);
+      console.log("Receipt email sent to", emailValue, "and sales@siwakhelweholdings.co.za");
     }
 
     res.sendStatus(200);
